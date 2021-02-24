@@ -9,6 +9,13 @@ all_sprites = pygame.sprite.Group()
 currect_sprites = pygame.sprite.Group()
 notcurrect_sprites = pygame.sprite.Group()
 
+horizontal_borders = pygame.sprite.Group()
+vertical_borders = pygame.sprite.Group()
+borders = pygame.sprite.Group()
+flag = False
+n = 0
+a = 17
+
 
 def get_color():
     colors = ['red', 'orange', 'yellow', 'blue', 'purple', 'green', 'pink']
@@ -71,33 +78,45 @@ class Board:
             self.board[cell[1]][cell[0]] = int(not self.board[cell[1]][cell[0]])
 
 
+class Border(pygame.sprite.Sprite):
+    # строго вертикальный или строго горизонтальный отрезок
+    def __init__(self, x1, y1, x2, y2):
+        super().__init__(borders)
+        if x1 == x2:  # вертикальная стенка
+            self.add(vertical_borders)
+            self.image = pygame.Surface([5, y2 - y1])
+            self.rect = pygame.Rect(x1, y1, 1, y2 - y1)
+        else:  # горизонтальная стенка
+            self.add(horizontal_borders)
+            self.image = pygame.Surface([x2 - x1, 5])
+            self.rect = pygame.Rect(x1, y1, x2 - x1, 1)
+
+
 class Square(pygame.sprite.Sprite):
     def __init__(self, x, y, color, *group):
         super().__init__(*group)
-        self.a = 45
-        self.image = pygame.Surface((self.a, self.a),
+        self.a = 17
+        self.image = pygame.Surface((self.a - 2, self.a -2),
                                     pygame.SRCALPHA, 32)
         pygame.draw.rect(self.image, color,
                          (0, 0, self.a, self.a), 0)
-        self.top, self.left = 10, 10
+        self.top, self.left = self.a * 2, self.a * 2
         self.w, self.h = 10, 20
         self.x, self.y = x, y
         self.rect = self.image.get_rect()
-        self.rect.x, self.rect.y, self.rect.size = self.a * (self.w // 2 + self.x) + self.left, \
-                                                   self.a * (0 - self.y) + self.top, (self.a, self.a)
+        self.rect.x, self.rect.y = self.a * (self.w // 2 + self.x) + 1 + self.left, \
+                                                   self.a * (0 - self.y) + self.top + 1
 
     def update(self):
-        global notcurrect_sprites, all_sprites, currect_sprites
-        if not pygame.sprite.spritecollideany(self, notcurrect_sprites) or self.rect.x > 500:
-            self.rect = self.rect.move(0, self.a)
+        global notcurrect_sprites, all_sprites, currect_sprites, flag, n, horizontal_borders
+        self.rect = self.rect.move(0, self.a)
+        if pygame.sprite.spritecollideany(self, notcurrect_sprites) or \
+                pygame.sprite.spritecollideany(self, borders) or self.rect.y > 400:
+            self.rect = self.rect.move(0, -self.a)
+            flag = True
         else:
-            notcurrect_sprites = all_sprites
-            self.kill()
-            color, next_color = get_color(), get_color()
-            figure, next_figure = get_figure(), get_figure()
-            pygame.time.set_timer(MYEVENTTYPE, 1000)
-            for i in figure:
-                Square(*i, color, currect_sprites, all_sprites)
+            self.rect = self.rect.move(0, -self.a)
+            n += 1
 
     def turn(self):
         self.rect = self.rect.move(self.a * (-self.x - self.y), self.a * (self.y - self.x))
@@ -111,17 +130,23 @@ class Square(pygame.sprite.Sprite):
 
     def down(self):
         self.update()
-        self.update()
 
 
 def tetris(screen):
-    global all_sprites, currect_sprites, notcurrect_sprites
+    global all_sprites, currect_sprites, notcurrect_sprites, flag, n
     board = [[0 for _ in range(10)] for _ in range(20)]
     clock = pygame.time.Clock()
+    img = pygame.transform.scale(pygame.image.load('data/sprites/backgrounds/bg2.png'), (800, 600))
     running = True
     color, next_color = get_color(), get_color()
     figure, next_figure = get_figure(), get_figure()
     pygame.time.set_timer(MYEVENTTYPE, 1000)
+    a = 17
+    Border(2 * a, 2 * a - 5, 12 * a + 5, 2 * a - 5)
+    Border(2 * a, 22 * a, 12 * a + 5, 22 * a)
+    Border(2 * a, 2 * a, 2 * a, 22 * a + 5)
+    Border(12 * a, 2 * a, 12 * a, 22 * a + 5)
+
     for i in figure:
         Square(*i, color, currect_sprites, all_sprites)
     while running:
@@ -134,7 +159,7 @@ def tetris(screen):
                     for i in currect_sprites:
                         i.turn()
             if event.type == MYEVENTTYPE:
-                currect_sprites.update()
+                print(currect_sprites.update())
         keys = pygame.key.get_pressed()
         if keys[pygame.K_RIGHT]:
             for i in currect_sprites:
@@ -145,8 +170,23 @@ def tetris(screen):
         if keys[pygame.K_DOWN]:
             for i in currect_sprites:
                 i.down()
-        screen.fill((0, 0, 0))
+        screen.blit(img, (0, 0))
+        if flag:
+            notcurrect_sprites = all_sprites.copy()
+            currect_sprites = pygame.sprite.Group()
+            color, next_color = get_color(), get_color()
+            figure, next_figure = get_figure(), get_figure()
+            pygame.time.set_timer(MYEVENTTYPE, 1000)
+            for i in figure:
+                Square(*i, color, currect_sprites, all_sprites)
+            flag = False
+        else:
+            if n > 0:
+                for i in currect_sprites:
+                    i.rect = i.rect.move(0, i.a)
+                n -= 4
         all_sprites.draw(screen)
+        borders.draw(screen)
         pygame.display.flip()
         clock.tick(FPS)
 
