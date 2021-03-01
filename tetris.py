@@ -1,17 +1,24 @@
 from random import choice
 import pygame
+import sqlite3
 
 FPS = 15
 MYEVENTTYPE = pygame.USEREVENT + 1
+
+# создание группы спрайтов
 all_sprites = pygame.sprite.Group()
 currect_sprites = pygame.sprite.Group()
 notcurrect_sprites = pygame.sprite.Group()
 
+# создание поля
 board = [[0 for _ in range(10)] for _ in range(20)]
 
+# создание группы спрайтов
 horizontal_borders = pygame.sprite.Group()
 vertical_borders = pygame.sprite.Group()
 borders = pygame.sprite.Group()
+
+# флаг и ширина квадрата
 flag = False
 a = 17
 
@@ -23,11 +30,13 @@ def text_format(message, font, size, color):
 
 
 def get_color():
+    # получение цвета
     colors = ['red', 'orange', 'yellow', 'blue', 'purple', 'green', 'pink']
     return pygame.color.Color(choice(colors))
 
 
 def get_figure():
+    # получение фигуры
     figures = [[(-1, 0), (-2, 0), (0, 0), (1, 0)],
                [(0, -1), (-1, -1), (1, 0), (0, 0)],
                [(0, -1), (-1, 0), (1, -1), (0, 0)],
@@ -55,7 +64,8 @@ class Border(pygame.sprite.Sprite):
 
 
 class Square(pygame.sprite.Sprite):
-    def __init__(self, x, y, color, *group):
+    # класс квадратиков
+    def __init__(self, x, y, top, left, color, *group):
         super().__init__(*group)
         self.a = 27
         self.image = pygame.Surface((self.a - 2, self.a - 2),
@@ -63,46 +73,57 @@ class Square(pygame.sprite.Sprite):
         pygame.draw.rect(self.image, color,
                          (0, 0, self.a, self.a), 0)
         self.w, self.h = 10, 20
-        self.top = screen.get_height() // 2 - self.h // 2 * self.a
-        self.left = screen.get_width() // 4 - self.w // 2 * self.a
-        print(self.top, self.left)
+
+        # смещение от точки (0;0)
+        self.top = top
+        self.left = left
+
+        # координаты на поле
         self.x, self.y = x, y
         self.xx = self.x + self.w // 2
         self.yy = abs(self.y)
+
         self.rect = self.image.get_rect()
         self.rect.x = self.a * (self.w // 2 + self.x) + 1 + self.left
         self.rect.y = self.a * (0 - self.y) + self.top + 1
 
     def update(self):
-        global notcurrect_sprites, all_sprites, currect_sprites, flag, n, horizontal_borders
+        global notcurrect_sprites, all_sprites, currect_sprites, flag, horizontal_borders
         self.rect = self.rect.move(0, self.a)
         if pygame.sprite.spritecollideany(self, notcurrect_sprites) or \
                 pygame.sprite.spritecollideany(self, horizontal_borders) or board[self.yy][self.xx]:
+            # проверка на столкновение
             flag = True
         self.rect = self.rect.move(0, -self.a)
 
     def turn(self):
+        # проверка на поворот фигуры
         self.rect = self.rect.move(self.a * (-self.x - self.y), self.a * (self.y - self.x))
         if pygame.sprite.spritecollideany(self, notcurrect_sprites) or \
                 pygame.sprite.spritecollideany(self, borders):
+            # проверка на столкновение
             self.rect = self.rect.move(self.a * (self.x + self.y), self.a * (-self.y + self.x))
             return False
         self.rect = self.rect.move(self.a * (self.x + self.y), self.a * (-self.y + self.x))
         return True
 
     def right(self):
+        # проверка на возможность сдвига вправо
         self.rect = self.rect.move(self.a, 0)
         if pygame.sprite.spritecollideany(self, notcurrect_sprites) or \
                 pygame.sprite.spritecollideany(self, vertical_borders) or board[self.yy][self.xx]:
+            # проверка на столкновение
             self.rect = self.rect.move(-self.a, 0)
             return False
         self.rect = self.rect.move(-self.a, 0)
         return True
 
     def left_(self):
+        # проверка на возможность сдвига влево
         self.rect = self.rect.move(-self.a, 0)
         if pygame.sprite.spritecollideany(self, notcurrect_sprites) or \
                 pygame.sprite.spritecollideany(self, vertical_borders) or board[self.yy][self.xx]:
+            # проверка на столкновение
             self.rect = self.rect.move(self.a, 0)
             return False
         self.rect = self.rect.move(self.a, 0)
@@ -110,42 +131,61 @@ class Square(pygame.sprite.Sprite):
 
 
 def tetris(screen):
-    global all_sprites, currect_sprites, notcurrect_sprites, flag, n, board
+    global all_sprites, currect_sprites, notcurrect_sprites, flag, board
+
     clock = pygame.time.Clock()
-    img = pygame.transform.scale(pygame.image.load('data/fon.jpg'), (800, 600))
+    img = pygame.transform.scale(pygame.image.load('data/image/fon.jpg'), (800, 600))
     running = True
+
+    # получение фигур и цветов
     color, next_color = get_color(), get_color()
     figure, next_figure = get_figure(), get_figure()
+
     pygame.time.set_timer(MYEVENTTYPE, 1000)
     w, h, a = 10, 20, 27
     top = screen.get_height() // 2 - h // 2 * a
     left = screen.get_width() // 4 - w // 2 * a
+
+    # создание стенок
     Border(left - 5, top - 5, left + 10 * a + 5, top - 5)
     Border(left - 5, top + 20 * a, left + 10 * a + 5, top + 20 * a)
     Border(left - 5, top - 5, left - 5, top + 20 * a + 5)
     Border(left + 10 * a, top - 5, left + 10 * a, top + 20 * a + 5)
 
+    # подключение шрифтов
     main_font = ('data/fonts/font.ttf', 65)
     font = ('data/fonts/font.ttf', 45)
 
+    # создание текстов
     title_tetris = text_format('TETRIS', *main_font, pygame.Color('darkorange'))
     title_score = text_format('score:', *font, pygame.Color('green'))
-    title_record = text_format('record:', *font, pygame.Color('purple'))
+    title_record = text_format('level:', *font, pygame.Color('purple'))
+    # показ новой фигуры
     for i in next_figure:
         pygame.draw.rect(screen, next_color, (i[0] * a + 580, i[1] * a + 380, a, a), 0)
 
-    score, lines = 0, 0
-    scores = {0: 0, 1: 100, 2: 300, 3: 700, 4: 1500}
+    score, levels = 0 , 1
 
     for i in figure:
-        Square(*i, color, currect_sprites, all_sprites)
+        Square(*i, top, left, color, currect_sprites, all_sprites)
+
     while running:
+        # проверка на завершение игры
+        if sum(board[0]) > 0:
+            con = sqlite3.connect('data/records.db')
+            cur = con.cursor()
+            cur.execute(f"""INSERT INTO tetris VALUES (?)""", (score, ))
+            con.commit()
+            return screen, 'tetris', score
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
                 quit()
+
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_UP:
+                    # поворот фигуры
                     if all(i.turn() for i in currect_sprites):
                         for i in currect_sprites:
                             i.rect = i.rect.move(i.a * (-i.x - i.y), i.a * (i.y - i.x))
@@ -154,6 +194,7 @@ def tetris(screen):
                             i.x, i.y = -i.y, i.x
 
             if event.type == MYEVENTTYPE:
+                # автоматическое перемещение фигуры вниз
                 currect_sprites.update()
                 if flag:
                     for i in currect_sprites:
@@ -163,29 +204,38 @@ def tetris(screen):
                     color, next_color = next_color, get_color()
                     figure, next_figure = next_figure, get_figure()
                     for i in figure:
-                        Square(*i, color, currect_sprites, all_sprites)
+                        Square(*i, top, left, color, currect_sprites, all_sprites)
                     flag = False
                 else:
                     for i in currect_sprites:
                         i.rect = i.rect.move(0, i.a)
                         i.yy += 1
+
         keys = pygame.key.get_pressed()
+
         if keys[pygame.K_RIGHT]:
+            # сдвиг вправо
             if all(i.right() for i in currect_sprites):
                 for i in currect_sprites:
                     i.rect = i.rect.move(i.a, 0)
                     i.xx += 1
 
         if keys[pygame.K_LEFT]:
+            # сдвиг влево
             if all(i.left_() for i in currect_sprites):
                 for i in currect_sprites:
                     i.rect = i.rect.move(-i.a, 0)
                     i.xx -= 1
+
         if keys[pygame.K_DOWN]:
             pygame.event.post(pygame.event.Event(MYEVENTTYPE))
+
         screen.blit(img, (0, 0))
+
         for y in range(len(board)):
+            # проверка на заполненность ряда
             if sum(board[y]) == 10:
+                score += 100
                 for i in notcurrect_sprites:
                     if i.yy == y:
                         i.kill()
@@ -194,13 +244,29 @@ def tetris(screen):
                             i.yy += 1
                             i.rect = i.rect.move(0, i.a)
                 board = [list(0 for i in range(10))] + board[:y] + board[y + 1:]
+
+        # обновление уровня
+        if levels < score // 4000 + 1:
+            levels = score // 4000 + 1
+            pygame.time.set_timer(MYEVENTTYPE, (6 - levels) * 100)
+
+        # отрисовка отбъектов и следующей фигуры
         all_sprites.draw(screen)
         borders.draw(screen)
         for i in next_figure:
-            pygame.draw.rect(screen, next_color, (i[0] * a + 580 + 1, i[1] * a + 380 + 1, a - 2, a - 2), 0)
-        screen.blit(title_tetris, (485, -10))
-        screen.blit(title_score, (300, 300))
-        screen.blit(title_record, (525, 650))
+            pygame.draw.rect(screen, next_color, (2 * i[0] * a + 1 + screen.get_width() // 4 * 3 - a,
+                                                  2 * -i[1] * a + 1 + screen.get_height() // 3, 2 * a - 4, 2 * a - 4),
+                             0)
+
+        screen.blit(title_tetris,
+                    (screen.get_width() // 4 * 3 - title_tetris.get_width() // 2, screen.get_height() // 32))
+        screen.blit(title_score, (screen.get_width() // 4 * 3 - title_score.get_width() // 2, screen.get_height() // 2))
+        text = text_format(str(score), *font, pygame.color.Color('blue'))
+        screen.blit(text, (screen.get_width() // 4 * 3 - text.get_width() // 2, screen.get_height() // 10 * 6))
+        screen.blit(title_record,
+                    (screen.get_width() // 4 * 3 - title_record.get_width() // 2, screen.get_height() // 4 * 3))
+        text = text_format(str(levels), *font, pygame.color.Color('blue'))
+        screen.blit(text, (screen.get_width() // 4 * 3 - text.get_width() // 2, screen.get_height() // 6 * 5))
 
         pygame.display.flip()
         clock.tick(FPS)
